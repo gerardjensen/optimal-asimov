@@ -1,3 +1,9 @@
+function spinal_case(str) {
+  return str.replace(/^[\W_]+|[\W_]+$|([\W_]+)/g, function ($0, $1) {
+              return $1 ? "-" : "";
+         }).replace(/([a-z])(?=[A-Z])/g, '$1-').toLowerCase();
+}
+
 function construct_div(obj,depth)
 {
   if(Number.isInteger(obj)) {
@@ -9,18 +15,28 @@ function construct_div(obj,depth)
 
   let separator = document.createElement("div");
   separator.setAttribute("class", "separator");
-  let title = document.createElement("h" + (depth+1));
+  let title = document.createElement(depth > 2 ? "p" : "h" + (depth+1));
   title.innerText = obj["name"];
   separator.appendChild(title);
 
   let container = document.createElement("div");
   container.setAttribute("class", "container");
+  container.setAttribute("id", spinal_case(obj["name"]));
 
   let content = obj["content"];
 
+  let cd_cont = document.createElement("div");
+  cd_cont.setAttribute("class", "card-container");
+  cd_cont.setAttribute("id", container.getAttribute("id") + "-cd-cont");
+  //cd_cont.setAttribute("style", "width: 200px");
   for(let i = 0; i < content.length; i++) {
-    container.appendChild(construct_div(content[i]));;
+    let elm = construct_div(content[i], depth + 1);
+    if(elm.getAttribute("class") == "separator")
+      container.appendChild(elm);
+    else 
+      cd_cont.appendChild(elm);
   }
+  container.appendChild(cd_cont);
   separator.appendChild(container);
 
   return separator;
@@ -37,10 +53,8 @@ async function mk_content() {
 
     const cont_div = document.getElementById("content");
     for(let i = 0; i<result.length; i++) {
-      // cont_div.appendChild(construct_div(i));
       cont_div.appendChild(construct_div(result[i], 1))
     }
-
 
   } catch (error) {
     console.error(error.message);
@@ -48,6 +62,39 @@ async function mk_content() {
 
 }
 
+function append_stories(titles) {
+  for(let i = 0; i<titles.length; i++) {
+    let title = titles[i];
+    let id = title["isfdb_id"];
+    let is_novel = title["type"] == "NOVEL";
+    let elm = document.getElementById("t-" + id);
+    let sf_container = document.getElementById("science-fiction-cd-cont");
+
+    if(elm) {
+      if(is_novel)
+        elm.setAttribute("style", "border-radius: 0px; background-color: #AAA;");
+    } else {
+      let div = document.createElement("div");
+      div.setAttribute("id", "t-" + id);
+      div.setAttribute("class", "card");
+      sf_container.appendChild(div);
+    }
+  }
+}
+
 (async() => {
   await mk_content();
+  
+  try {
+    const response = await fetch("titles.json");
+    if (!response.ok) {
+      throw new Error(`Response status: ${response.status}`);
+    }
+
+    const result = await response.json();
+    append_stories(result);
+
+  } catch (error) {
+    console.error(error.message);
+  }
 })()
