@@ -2,11 +2,18 @@
   <head>
     
     <style>
+      .novel {
+         background-color: #AAA;
+      }
+
+      .short-fiction {
+        border-radius: 5px;
+        background-color: #CCC;  
+      }
+
       .card {
         width: 20px;
         height: 30px;
-        border-radius: 5px;
-        background-color: #CCC;
         flex-shrink: 0; 
       }
 
@@ -48,8 +55,15 @@
   </head>
   <body>
     <h1>The Optimal Asimov</h1>
-    <p>WIP</p>
+    <p>Collection Viewer</p>
+    <div id="selector">
+      <label for="pubs"></label>
+      <select onchange="on_pub_select(this.selectedIndex, this.value);" name="pubs" id="pubs">
+        <option selected value> -- no publication -- </option>
+      </select>
+    </div>
     <div id="content"></div>
+
 
     <script src="script.js"></script> 
   </body>

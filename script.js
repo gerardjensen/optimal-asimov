@@ -9,7 +9,7 @@ function construct_div(obj,depth)
   if(Number.isInteger(obj)) {
     let div = document.createElement("div");
     div.setAttribute("id", "t-" + obj);
-    div.setAttribute("class", "card");
+    div.setAttribute("class", "card short-fiction");
     return div;
   }
 
@@ -28,7 +28,7 @@ function construct_div(obj,depth)
   let cd_cont = document.createElement("div");
   cd_cont.setAttribute("class", "card-container");
   cd_cont.setAttribute("id", container.getAttribute("id") + "-cd-cont");
-  //cd_cont.setAttribute("style", "width: 200px");
+
   for(let i = 0; i < content.length; i++) {
     let elm = construct_div(content[i], depth + 1);
     if(elm.getAttribute("class") == "separator")
@@ -42,24 +42,11 @@ function construct_div(obj,depth)
   return separator;
 }
 
-async function mk_content() {
-  try {
-    const response = await fetch("relations.json");
-    if (!response.ok) {
-      throw new Error(`Response status: ${response.status}`);
-    }
-
-    const result = await response.json();
-
-    const cont_div = document.getElementById("content");
-    for(let i = 0; i<result.length; i++) {
-      cont_div.appendChild(construct_div(result[i], 1))
-    }
-
-  } catch (error) {
-    console.error(error.message);
+async function mk_content(result) {
+  const cont_div = document.getElementById("content");
+  for(let i = 0; i<result.length; i++) {
+    cont_div.appendChild(construct_div(result[i], 1))
   }
-
 }
 
 function append_stories(titles) {
@@ -72,29 +59,69 @@ function append_stories(titles) {
 
     if(elm) {
       if(is_novel)
-        elm.setAttribute("style", "border-radius: 0px; background-color: #AAA;");
+        elm.setAttribute("class", "card novel");
     } else {
       let div = document.createElement("div");
       div.setAttribute("id", "t-" + id);
-      div.setAttribute("class", "card");
+      if(is_novel)
+        div.setAttribute("class", "card novel");
+      else
+        div.setAttribute("class", "card short-fiction");
+
       sf_container.appendChild(div);
     }
   }
 }
 
-(async() => {
-  await mk_content();
-  
+async function fetch_json(path) { 
   try {
-    const response = await fetch("titles.json");
+    const response = await fetch(path);
     if (!response.ok) {
       throw new Error(`Response status: ${response.status}`);
     }
 
     const result = await response.json();
-    append_stories(result);
+    return result;
 
   } catch (error) {
     console.error(error.message);
   }
+  return null;
+}
+
+function append_pubs(pubs) {
+  let selector = document.getElementById("pubs");
+  for (let i = 0; i<pubs.length; i++) {
+    let pub = pubs[i];
+    let item = document.createElement("option");
+    item.innerText = pub["name"];
+    item.setAttribute("value", pub["pub_id"]);
+    selector.appendChild(item);
+  }
+}
+
+let pubs;
+let titles;
+
+(async() => {
+  await mk_content(await fetch_json("relations.json"));
+  titles = await fetch_json("titles.json");
+  append_stories(titles);
+  pubs = await fetch_json("pubs.json");
+  pubs = pubs.sort((a, b) => a["name"].localeCompare(b["name"]));
+  append_pubs(pubs);
 })()
+
+function on_pub_select(a,b) {
+  for(let i = 0; i<titles.length; i++) 
+    document.getElementById("t-" + titles[i]["isfdb_id"]).removeAttribute("style");
+
+  if(a == 0) 
+    return;
+  
+  console.log(pubs[a-1]);
+  let _titles = pubs[a-1]["titles"];
+  for(let i = 0; i<_titles.length; i++) { 
+      document.getElementById("t-" + _titles[i]).setAttribute("style", "background-color: #00A");
+  }
+}
