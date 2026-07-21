@@ -1,3 +1,6 @@
+let pubs;
+let titles;
+
 function spinal_case(str) {
   return str.replace(/^[\W_]+|[\W_]+$|([\W_]+)/g, function ($0, $1) {
               return $1 ? "-" : "";
@@ -9,7 +12,13 @@ function construct_div(obj,depth)
   if(Number.isInteger(obj)) {
     let div = document.createElement("div");
     div.setAttribute("id", "t-" + obj);
-    div.setAttribute("class", "card short-fiction");
+    div.setAttribute("class", "card");
+    console.log(obj);
+    let title = titles.find(a => a["isfdb_id"] == obj);
+    let span = document.createElement("span");
+    span.innerText = title["title"];
+    span.setAttribute("class", "tooltiptext");
+    div.appendChild(span);
     return div;
   }
 
@@ -58,15 +67,24 @@ function append_stories(titles) {
     let sf_container = document.getElementById("science-fiction-cd-cont");
 
     if(elm) {
-      if(is_novel)
-        elm.setAttribute("class", "card novel");
+      let class_type = is_novel ? "novel" : "short-fiction";
+      if(!title["collected"])
+        class_type = class_type + " uncollected";
+      elm.setAttribute("class", elm.getAttribute("class") + " " + class_type);
     } else {
       let div = document.createElement("div");
       div.setAttribute("id", "t-" + id);
+      let span = document.createElement("span");
+      span.innerText = title["title"];
+      span.setAttribute("class", "tooltiptext");
+      div.appendChild(span);
       if(is_novel)
         div.setAttribute("class", "card novel");
       else
         div.setAttribute("class", "card short-fiction");
+
+      if(!title["collected"])
+        div.setAttribute("class", div.getAttribute("class") + " uncollected");
 
       sf_container.appendChild(div);
     }
@@ -100,15 +118,13 @@ function append_pubs(pubs) {
   }
 }
 
-let pubs;
-let titles;
-
 (async() => {
-  await mk_content(await fetch_json("relations.json"));
   titles = await fetch_json("titles.json");
-  append_stories(titles);
   pubs = await fetch_json("pubs.json");
   pubs = pubs.sort((a, b) => a["name"].localeCompare(b["name"]));
+
+  await mk_content(await fetch_json("relations.json"));
+  append_stories(titles);
   append_pubs(pubs);
 })()
 
@@ -119,7 +135,6 @@ function on_pub_select(a,b) {
   if(a == 0) 
     return;
   
-  console.log(pubs[a-1]);
   let _titles = pubs[a-1]["titles"];
   for(let i = 0; i<_titles.length; i++) { 
       document.getElementById("t-" + _titles[i]).setAttribute("style", "background-color: #00A");
