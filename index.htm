@@ -16,7 +16,11 @@
         height: 30px;
         flex-shrink: 0; 
         position: relative;
-        display: inline-block;
+        color:white;
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        font-size: 22px;
       }
 
       .uncollected {
@@ -79,16 +83,30 @@
         visibility: visible;
       }
 
+      .pub-list {
+        display: flex;
+        flex-wrap: wrap;            
+        gap: 4px;
+        align-content: flex-start;
+      }
+
+      .pub-list > p {
+        margin: 5px;
+      }
+
     </style>
   </head>
   <body>
     <h1>The Optimal Asimov</h1>
-    <p>Collection Viewer</p>
-    <div id="selector">
+    <h2>Collection Viewer</h2>
+    <div id="selector" style="margin-bottom: 10px">
       <label for="pubs"></label>
       <select onchange="on_pub_select(this.selectedIndex, this.value);" name="pubs" id="pubs">
         <option selected value> -- no publication -- </option>
       </select>
+      <button style="position: relative; left: 7px;" onclick="add_pub_viewer()"> Add</button>
+      <div id="selected-pubs" class="pub-list">
+      </div>
     </div>
     <div id="content"></div>
 

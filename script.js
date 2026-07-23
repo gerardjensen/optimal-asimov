@@ -1,5 +1,8 @@
 let pubs;
 let titles;
+const selected_pubs = new Set();
+let selected_pub = 0;
+let title_multiplicity = new Map();
 
 function spinal_case(str) {
   return str.replace(/^[\W_]+|[\W_]+$|([\W_]+)/g, function ($0, $1) {
@@ -10,16 +13,19 @@ function spinal_case(str) {
 function construct_div(obj,depth)
 {
   if(Number.isInteger(obj)) {
+    let link = document.createElement("a");  
+    link.setAttribute("href", "https://www.isfdb.org/cgi-bin/title.cgi?"+obj);
+    link.setAttribute("target", "_blank");
     let div = document.createElement("div");
     div.setAttribute("id", "t-" + obj);
     div.setAttribute("class", "card");
-    console.log(obj);
     let title = titles.find(a => a["isfdb_id"] == obj);
     let span = document.createElement("span");
     span.innerText = title["title"];
     span.setAttribute("class", "tooltiptext");
     div.appendChild(span);
-    return div;
+    link.appendChild(div);
+    return link;
   }
 
   let separator = document.createElement("div");
@@ -128,15 +134,86 @@ function append_pubs(pubs) {
   append_pubs(pubs);
 })()
 
-function on_pub_select(a,b) {
+function on_pub_select(a,b) { 
+  selected_pub = a;
+
   for(let i = 0; i<titles.length; i++) 
     document.getElementById("t-" + titles[i]["isfdb_id"]).removeAttribute("style");
 
+
+  on_selected_pubs_changed();
+
   if(a == 0) 
     return;
-  
+ 
   let _titles = pubs[a-1]["titles"];
   for(let i = 0; i<_titles.length; i++) { 
-      document.getElementById("t-" + _titles[i]).setAttribute("style", "background-color: #00A");
+      document.getElementById("t-" + _titles[i]).setAttribute("style", "background-color: #0A0");
+  }
+}
+
+function add_pub_viewer() {
+  let pub = null;
+  if(selected_pub == 0) 
+    return;
+  
+  pub = pubs[selected_pub - 1];
+
+  let is_new = !selected_pubs.has(selected_pub);
+
+  selected_pubs.add(selected_pub);
+
+  on_selected_pubs_changed();
+  
+  if(!is_new) return;
+
+  let selected_pubs_container = document.getElementById("selected-pubs");
+  let label = document.createElement("p");
+  let link = document.createElement("a");
+  link.setAttribute("href", "https://www.isfdb.org/cgi-bin/pl.cgi?"+pub["pub_id"]);
+  link.setAttribute("target", "_blank");
+  link.innerText = pub["name"];
+  label.appendChild(link);
+  selected_pubs_container.appendChild(label);
+}
+
+function on_selected_pubs_changed() {
+  console.log(selected_pubs);
+  title_multiplicity.clear();
+
+  for(let index of selected_pubs) {
+    let _titles = pubs[index-1]["titles"];
+    for(let i = 0; i<_titles.length; i++) {
+        if(!title_multiplicity.has(_titles[i])) {
+          title_multiplicity.set(_titles[i], 1);
+        } else {
+          title_multiplicity.set(_titles[i], title_multiplicity.get(_titles[i]) + 1);
+        }
+        document.getElementById("t-" + _titles[i]).setAttribute("style", "background-color: #00A"); 
+    }
+
+
+  }
+  
+  for(let title of titles) {
+    let id = title["isfdb_id"];
+    let card = document.getElementById("t-" + id);
+
+    if(title_multiplicity.has(id) && title_multiplicity.get(id) > 1) {
+      let span;
+      if(card.childElementCount == 1) {
+        span = document.createElement("span");
+        card.appendChild(span);
+      } else 
+        span = card.children[1];
+
+      span.innerText = title_multiplicity.get(id);
+    } else {
+      if(card.childElementCount == 1)
+        continue;
+      
+      card.removeChild(card.children[1]);
+    }
+
   }
 }
