@@ -78,6 +78,9 @@ function append_stories(titles) {
         class_type = class_type + " uncollected";
       elm.setAttribute("class", elm.getAttribute("class") + " " + class_type);
     } else {
+      let link = document.createElement("a");  
+      link.setAttribute("href", "https://www.isfdb.org/cgi-bin/title.cgi?"+id);
+      link.setAttribute("target", "_blank");
       let div = document.createElement("div");
       div.setAttribute("id", "t-" + id);
       let span = document.createElement("span");
@@ -92,7 +95,8 @@ function append_stories(titles) {
       if(!title["collected"])
         div.setAttribute("class", div.getAttribute("class") + " uncollected");
 
-      sf_container.appendChild(div);
+      link.appendChild(div);
+      sf_container.appendChild(link);
     }
   }
 }
@@ -137,10 +141,6 @@ function append_pubs(pubs) {
 function on_pub_select(a,b) { 
   selected_pub = a;
 
-  for(let i = 0; i<titles.length; i++) 
-    document.getElementById("t-" + titles[i]["isfdb_id"]).removeAttribute("style");
-
-
   on_selected_pubs_changed();
 
   if(a == 0) 
@@ -168,17 +168,42 @@ function add_pub_viewer() {
   if(!is_new) return;
 
   let selected_pubs_container = document.getElementById("selected-pubs");
-  let label = document.createElement("p");
   let link = document.createElement("a");
+  let div = document.createElement("div");
+  let cross = document.createElement("span");
+  let label = document.createElement("p");
   link.setAttribute("href", "https://www.isfdb.org/cgi-bin/pl.cgi?"+pub["pub_id"]);
   link.setAttribute("target", "_blank");
   link.innerText = pub["name"];
+  cross.innerHTML = "&#x2715;";
+  cross.setAttribute("class", "close");
+
+  cross.addEventListener("click", (() => {
+    const pub_id = selected_pub;
+    return () => del_pub(pub_id);
+  })());
+
   label.appendChild(link);
-  selected_pubs_container.appendChild(label);
+  div.setAttribute("class", "pub-item");
+  div.setAttribute("id", "p-" + selected_pub);
+  div.appendChild(cross);
+  div.appendChild(label);
+  selected_pubs_container.appendChild(div);
+}
+
+function del_pub(id) {
+  let pub_div = document.getElementById("p-" + id);
+  let sel_div = document.getElementById("selected-pubs");
+  sel_div.removeChild(pub_div);
+  selected_pubs.delete(id);
+  on_selected_pubs_changed();
 }
 
 function on_selected_pubs_changed() {
-  console.log(selected_pubs);
+
+  for(let i = 0; i<titles.length; i++) 
+    document.getElementById("t-" + titles[i]["isfdb_id"]).removeAttribute("style");
+
   title_multiplicity.clear();
 
   for(let index of selected_pubs) {

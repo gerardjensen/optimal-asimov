@@ -1,6 +1,6 @@
-<html>
-  <head>
-    
+<!DOCTYPE html>
+<html lang="en">
+  <head> 
     <style>
       .novel {
          background-color: #AAA;
@@ -88,12 +88,42 @@
         flex-wrap: wrap;            
         gap: 4px;
         align-content: flex-start;
+        margin-top: 5px;
       }
 
       .pub-list > p {
         margin: 5px;
       }
 
+      .pub-item > p > a, .card-container > a { 
+        color: inherit !important;
+        text-decoration: none !important;
+      }
+
+      .pub-item {
+        border: 1px solid #000;
+        padding-left: 3px;
+        padding-right: 3px;
+        border-radius: 10px;
+        display: flex;
+        gap: 5px;
+      }
+
+      .pub-item > p:hover {
+        text-decoration: underline;
+      }
+
+      .close {
+        cursor: pointer;
+        padding: 4px 4px;
+        margin-left: 5px;
+        margin-right: 3px;
+
+      }
+
+      .close:hover {
+        background: #bbb;
+      }
     </style>
   </head>
   <body>
