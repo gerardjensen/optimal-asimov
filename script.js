@@ -136,6 +136,8 @@ function append_pubs(pubs) {
   await mk_content(await fetch_json("relations.json"));
   append_stories(titles);
   append_pubs(pubs);
+
+  add_pubs2selectors();
 })()
 
 function on_pub_select(a,b) { 
@@ -241,4 +243,40 @@ function on_selected_pubs_changed() {
     }
 
   }
+}
+
+function add_pubs2selectors() {
+  let I_selector = document.getElementById("I-pubs");
+  let U_selector = document.getElementById("U-pubs");
+
+  for(let pub of pubs) {
+    let elmI = document.createElement("option");
+    let elmU = document.createElement("option");
+    elmI.setAttribute("value", pub["pub_id"]);
+    elmI.innerText = pub["name"]; 
+    I_selector.appendChild(elmI);
+    elmU.setAttribute("value", pub["pub_id"]);
+    elmU.innerText = pub["name"]; 
+    U_selector.appendChild(elmU);
+  }
+}
+
+function get_values(collection) {
+  ret = Array(collection.length);
+  for(let i = 0; i<collection.length; i++) {
+    ret[i] = parseInt(collection[i].value)
+  }
+
+  return ret;
+}
+
+function optimize() {
+  let unavailable = get_values(document.getElementById("U-pubs").selectedOptions);
+  let owned = get_values(document.getElementById("I-pubs").selectedOptions);
+  let selection = document.getElementById("ch-robots").checked ? 0 : 
+    document.getElementById("ch-foundation").checked ? 1 : 2;
+
+  console.log(unavailable);
+  console.log(owned);
+  console.log(selection);
 }

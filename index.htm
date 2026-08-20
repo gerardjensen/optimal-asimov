@@ -103,10 +103,10 @@
       .pub-item {
         border: 1px solid #000;
         padding-left: 3px;
-        padding-right: 3px;
+        padding-right: 10px;
         border-radius: 10px;
         display: flex;
-        gap: 5px;
+        gap: 2px;
       }
 
       .pub-item > p:hover {
@@ -139,7 +139,28 @@
       </div>
     </div>
     <div id="content"></div>
-
+    <h2>Optimizer</h2>
+    <div id="optimizer" class="container">
+      <div>
+        <p><strong>Already owned:</strong></p> 
+        <select multiple size="10" id="I-pubs"></select>
+      </div>
+      <div>
+        <p><strong>Unavailable to buy:</strong></p>
+        <select multiple size="10" id="U-pubs"></select>
+      </div>
+      <div>
+        <p><strong>Objective:</strong></p> 
+        <input type="radio" id="ch-robots" name="objective" value="robots" checked="checked">
+        <label for="ch-robots">The Positronic Robot Stories</label><br>
+        <input type="radio" id="ch-foundation" name="objective" value="foundation">
+        <label for="ch-foundation">Foundation Universe</label><br>  
+        <input type="radio" id="ch-all" name="objective" value="all">
+        <label for="ch-all">All Science Fiction</label><br><br>
+      </div>
+    </div>
+    <button style="margin-top: 5px" onclick="optimize()"> Optimize! </button>
+    
 
     <script src="script.js"></script> 
   </body>
