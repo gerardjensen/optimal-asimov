@@ -1,8 +1,11 @@
+const exclude_novels = true;
+
 let pubs;
 let titles;
 const selected_pubs = new Set();
 let selected_pub = 0;
 let title_multiplicity = new Map();
+const objectives = Array(3);
 
 function spinal_case(str) {
   return str.replace(/^[\W_]+|[\W_]+$|([\W_]+)/g, function ($0, $1) {
@@ -138,6 +141,10 @@ function append_pubs(pubs) {
   append_pubs(pubs);
 
   add_pubs2selectors();
+
+  make_objectives();
+
+  Module._init_solver();
 })()
 
 function on_pub_select(a,b) { 
@@ -272,11 +279,93 @@ function get_values(collection) {
 
 function optimize() {
   let unavailable = get_values(document.getElementById("U-pubs").selectedOptions);
-  let owned = get_values(document.getElementById("I-pubs").selectedOptions);
+  let initial = get_values(document.getElementById("I-pubs").selectedOptions);
   let selection = document.getElementById("ch-robots").checked ? 0 : 
     document.getElementById("ch-foundation").checked ? 1 : 2;
 
   console.log(unavailable);
-  console.log(owned);
+  console.log(initial);
   console.log(selection);
+
+  // 1. Define data arrays
+  const goalData = new Int32Array(objectives[selection]);
+  const initialData = new Int32Array(initial);
+  const unavailableData = new Int32Array(unavailable);
+
+  // Allocate memory on the heap for the arrays
+  const goalPtr = Module._malloc(goalData.byteLength);
+  const initialPtr = Module._malloc(initialData.byteLength);
+  const unavailablePtr = Module._malloc(unavailableData.byteLength);
+
+  // Copy data into the HEAP
+  Module.HEAP32.set(goalData, goalPtr >> 2);
+  Module.HEAP32.set(initialData, initialPtr >> 2);
+  Module.HEAP32.set(unavailableData, unavailablePtr >> 2);
+
+  // 2. Allocate memory for the buyer_t struct 
+  // Assuming 32-bit architecture: 3 pointers (12 bytes) + 3 ints for lengths (12 bytes) = 24 bytes total.
+  const structPtr = Module._malloc(24);
+
+  // Write struct fields (offsets depend on your struct definition, typically pointer, len, pointer, len...)
+  Module.HEAP32[structPtr >> 2] = initialPtr;
+  Module.HEAP32[(structPtr + 4) >> 2] = initial.length;        // initial_len
+  Module.HEAP32[(structPtr + 8) >> 2] = goalPtr;
+  Module.HEAP32[(structPtr + 12) >> 2] = objectives[selection].length;      // goal_len
+  Module.HEAP32[(structPtr + 16) >> 2] = unavailablePtr;
+  Module.HEAP32[(structPtr + 20) >> 2] = unavailable.length;      // unavailable_len
+
+
+  // Allocate space for integer pointer z1 (4 bytes)
+  const z1Ptr = Module._malloc(4);
+
+  // 3. Run the solver loop
+  let N = -1;
+  let z;
+
+  do {
+    // Pass N, the pointer to the struct, and the pointer to z1
+    z = Module._solve(N, structPtr, z1Ptr);
+    
+    // Read z1 value from memory
+    const z1 = Module.HEAP32[z1Ptr >> 2];
+    
+    console.log(`${z1}\t${z}`);
+    N = z - 1;
+  } while (false && Module.HEAP32[z1Ptr >> 2] > 0);
+
+  // Clean up memory to prevent leaks
+  Module._free(goalPtr);
+  Module._free(initialPtr);
+  Module._free(unavailablePtr);
+  Module._free(structPtr);
+  Module._free(z1Ptr);
+}
+
+async function make_objectives() {
+  groups = await fetch_json("groups.json")
+  /*objectives[0] = groups[0];
+  objectives[1] = groups[1].concat(groups[0])
+  objectives[1].splice(-2); // Remove Victory Unintentional and Let's Get Together
+  objectives[2] = Array();*/
+  for(let i = 0; i<3; i++) objectives[i] = Array();
+
+  for (let title of titles) {
+    let is_novel = title["type"] == "NOVEL";
+    if(is_novel && exclude_novels)
+      continue;
+    let id = title["isfdb_id"];
+
+    if(groups[0].includes(id)) {
+      objectives[0].push(id);
+      if(id != 44199 && id != 44200)
+        objectives[1].push(id);
+    }
+    
+    if(groups[1].includes(id))
+      objectives[1].push(id);
+
+    if(groups[2].includes(id)) 
+      continue;
+    objectives[2].push(id);
+  }
 }
