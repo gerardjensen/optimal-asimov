@@ -1,11 +1,19 @@
 const exclude_novels = true;
 
 let pubs;
+let unsorted_pubs;
 let titles;
 const selected_pubs = new Set();
 let selected_pub = 0;
 let title_multiplicity = new Map();
 const objectives = Array(3);
+
+const value = document.querySelector("#step-value");
+const input = document.querySelector("#step-input");
+value.textContent = input.value;
+input.addEventListener("input", (event) => {
+  value.textContent = event.target.value;
+});
 
 function spinal_case(str) {
   return str.replace(/^[\W_]+|[\W_]+$|([\W_]+)/g, function ($0, $1) {
@@ -133,8 +141,8 @@ function append_pubs(pubs) {
 
 (async() => {
   titles = await fetch_json("titles.json");
-  pubs = await fetch_json("pubs.json");
-  pubs = pubs.sort((a, b) => a["name"].localeCompare(b["name"]));
+  unsorted_pubs = await fetch_json("pubs.json");
+  pubs = unsorted_pubs.slice().sort((a, b) => a["name"].localeCompare(b["name"]));
 
   await mk_content(await fetch_json("relations.json"));
   append_stories(titles);
@@ -143,8 +151,6 @@ function append_pubs(pubs) {
   add_pubs2selectors();
 
   make_objectives();
-
-  Module._init_solver();
 })()
 
 function on_pub_select(a,b) { 
@@ -161,20 +167,20 @@ function on_pub_select(a,b) {
   }
 }
 
-function add_pub_viewer() {
+function add_pub2viewer(id) {
   let pub = null;
-  if(selected_pub == 0) 
+  if(id == 0) 
     return;
   
-  pub = pubs[selected_pub - 1];
+  pub = pubs[id - 1];
 
-  let is_new = !selected_pubs.has(selected_pub);
+  let is_new = !selected_pubs.has(id);
 
-  selected_pubs.add(selected_pub);
+  selected_pubs.add(id);
 
-  on_selected_pubs_changed();
   
   if(!is_new) return;
+  on_selected_pubs_changed();
 
   let selected_pubs_container = document.getElementById("selected-pubs");
   let link = document.createElement("a");
@@ -188,16 +194,20 @@ function add_pub_viewer() {
   cross.setAttribute("class", "close");
 
   cross.addEventListener("click", (() => {
-    const pub_id = selected_pub;
+    const pub_id = id;
     return () => del_pub(pub_id);
   })());
 
   label.appendChild(link);
   div.setAttribute("class", "pub-item");
-  div.setAttribute("id", "p-" + selected_pub);
+  div.setAttribute("id", "p-" + id);
   div.appendChild(cross);
   div.appendChild(label);
   selected_pubs_container.appendChild(div);
+}
+
+function add_current_pub_viewer() {
+  add_pub2viewer(selected_pub);
 }
 
 function del_pub(id) {
@@ -277,15 +287,16 @@ function get_values(collection) {
   return ret;
 }
 
-function optimize() {
+async function optimize() {
+  on_optimization_requested();
   let unavailable = get_values(document.getElementById("U-pubs").selectedOptions);
   let initial = get_values(document.getElementById("I-pubs").selectedOptions);
   let selection = document.getElementById("ch-robots").checked ? 0 : 
     document.getElementById("ch-foundation").checked ? 1 : 2;
 
-  console.log(unavailable);
-  console.log(initial);
-  console.log(selection);
+  //console.log(unavailable);
+  //console.log(initial);
+  //console.log(selection);
 
   // 1. Define data arrays
   const goalData = new Int32Array(objectives[selection]);
@@ -317,21 +328,29 @@ function optimize() {
 
   // Allocate space for integer pointer z1 (4 bytes)
   const z1Ptr = Module._malloc(4);
+  const bitmapPtr = Module._malloc(8);
 
   // 3. Run the solver loop
   let N = -1;
   let z;
+  let step = parseInt(input.value);
 
   do {
     // Pass N, the pointer to the struct, and the pointer to z1
-    z = Module._solve(N, structPtr, z1Ptr);
+    z = Module._solve(N, structPtr, z1Ptr, bitmapPtr);
+    if(z == -1) break;
     
     // Read z1 value from memory
     const z1 = Module.HEAP32[z1Ptr >> 2];
-    
-    console.log(`${z1}\t${z}`);
-    N = z - 1;
-  } while (false && Module.HEAP32[z1Ptr >> 2] > 0);
+    const sol = Module.HEAP64[bitmapPtr >> 3];
+
+    const y = get_sol(sol);
+
+    on_solution_found(z,z1,y);
+    await new Promise(requestAnimationFrame);
+
+    N = z - step;
+  } while ( Module.HEAP32[z1Ptr >> 2] > 0);
 
   // Clean up memory to prevent leaks
   Module._free(goalPtr);
@@ -339,10 +358,28 @@ function optimize() {
   Module._free(unavailablePtr);
   Module._free(structPtr);
   Module._free(z1Ptr);
+  Module._free(bitmapPtr);
+
+  on_optimization_end();
+}
+
+function get_sol(bitmap) {
+  let sol = Array();
+  let m = pubs.length;
+  let cnt = m - 1;
+  while(bitmap)
+  {
+    let present = bitmap & 0b1n;
+    if(present)
+      sol.push(unsorted_pubs[cnt])
+    bitmap >>= 1n;
+    cnt--;
+  }
+  return sol;
 }
 
 async function make_objectives() {
-  groups = await fetch_json("groups.json")
+  let groups = await fetch_json("groups.json")
   /*objectives[0] = groups[0];
   objectives[1] = groups[1].concat(groups[0])
   objectives[1].splice(-2); // Remove Victory Unintentional and Let's Get Together

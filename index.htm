@@ -1,6 +1,9 @@
 <!DOCTYPE html>
 <html lang="en">
   <head> 
+    <title>The Optimal Asimov</title>
+    <meta charset="utf-8" />
+
     <style>
       #content {
         margin-right: 50px;
@@ -128,17 +131,27 @@
       .close:hover {
         background: #bbb;
       }
+
+      canvas {
+        display: block;
+      }
     </style>
   </head>
   <body>
     <h1>The Optimal Asimov</h1>
     <h2>Collection Viewer</h2>
-    <div id="selector" style="margin-bottom: 10px">
+    <p>Legend:</p>
+    <div class="container" style="margin-left: 20px;">
+      <div style="display:flex; gap:5px;"><span class="card novel"></span><p>Novel</p></div>
+      <div style="display:flex; gap:5px;"><span class="card short-fiction"></span><p>Short Fiction</p></div>
+      <div style="display:flex; gap:5px;"><span class="card short-fiction uncollected"></span><p>Short Fiction (uncollected)</p></div>
+    </div>
+    <div id="selector" style="margin-bottom: 10px; margin-top: 10px;">
       <label for="pubs"></label>
       <select onchange="on_pub_select(this.selectedIndex, this.value);" name="pubs" id="pubs">
         <option selected value> -- no publication -- </option>
       </select>
-      <button style="position: relative; left: 7px;" onclick="add_pub_viewer()"> Add</button>
+      <button style="position: relative; left: 7px;" onclick="add_current_pub_viewer()"> Add</button>
       <div id="selected-pubs" class="pub-list">
       </div>
     </div>
@@ -161,12 +174,31 @@
         <label for="ch-foundation">Foundation Universe</label><br>  
         <input type="radio" id="ch-all" name="objective" value="all">
         <label for="ch-all">All Science Fiction</label><br><br>
+        <input id="step-input" type="range" min="1" max="200" value="1" />
+        <p>Step size: <output id="step-value"></output></p>
       </div>
     </div>
-    <button style="margin-top: 5px" onclick="optimize()"> Optimize! </button>
-    
+    <button style="margin-top: 5px" onclick="optimize()"> Optimize! </button> 
 
-    <script src="./main.js"></script>
+    <h3>Optimal solutions</h3>
+    <p>After an optimization request click at a point to see the publications of that solution.<br>The X-axis is the total number of pages a group of books contains and the Y-axis is the useful pages (i.e. unrepeated pages of objective stories).</p>
+    <div class="container" style="margin-top:10px;">
+      <main>
+      </main>
+      <div id="sol_pubs">  
+      </div>
+    </div>
+
+    <script type="module">  
+    import createModule from "./main.js";
+
+    const Module = await createModule();
+    window.Module = Module;
+    Module._init_solver();
+
+    </script>
     <script src="script.js"></script> 
+    <script src="https://cdn.jsdelivr.net/npm/p5@2.3.3/lib/p5.js"></script>
+    <script src="ui.js"></script> 
   </body>
 </html>

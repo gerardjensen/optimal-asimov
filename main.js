@@ -1,3 +1,10 @@
+// This code implements the `-sMODULARIZE` settings by taking the generated
+// JS program code (INNER_JS_CODE) and wrapping it in a factory function.
+
+// When targeting node and ES6 we use `await import ..` in the generated code
+// so the outer function needs to be marked as async.
+async function Module(moduleArg = {}) {
+  var Module = moduleArg;
 // include: shell.js
 // include: minimum_runtime_check.js
 (function() {
@@ -61,7 +68,6 @@
 // after the generated code, you will need to define   var Module = {};
 // before the code. Then that object will be used in the code, and you
 // can continue to use Module afterwards as well.
-var Module = typeof Module != 'undefined' ? Module : {};
 
 // Determine the runtime environment we are in. You can customize this by
 // setting the ENVIRONMENT setting at compile time (see settings.js).
@@ -74,9 +80,18 @@ var ENVIRONMENT_IS_WORKER = !!globalThis.WorkerGlobalScope;
 var ENVIRONMENT_IS_NODE = globalThis.process?.versions?.node && globalThis.process?.type != 'renderer';
 var ENVIRONMENT_IS_SHELL = !ENVIRONMENT_IS_WEB && !ENVIRONMENT_IS_NODE && !ENVIRONMENT_IS_WORKER;
 
+if (ENVIRONMENT_IS_NODE) {
+  // When building an ES module `require` is not normally available.
+  // We need to use `createRequire()` to construct the require()` function.
+  const { createRequire } = await import('node:module');
+  /** @suppress{duplicate} */
+  var require = createRequire(import.meta.url);
+
+}
+
 // --pre-jses are emitted after the Module integration code, so that they can
 // refer to Module (if they choose; they can also define Module)
-// include: /tmp/tmpgiotzwwk.js
+// include: /tmp/tmpmwq30gqg.js
 
   if (!Module['expectedDataFileDownloads']) Module['expectedDataFileDownloads'] = 0;
   Module['expectedDataFileDownloads']++;
@@ -204,21 +219,21 @@ Module['FS_createPath']("/", "src", true, true);
 
   })();
 
-// end include: /tmp/tmpgiotzwwk.js
-// include: /tmp/tmpmp5p86k4.js
+// end include: /tmp/tmpmwq30gqg.js
+// include: /tmp/tmpqvasncqs.js
 
     // All the pre-js content up to here must remain later on, we need to run
     // it.
     if ((typeof ENVIRONMENT_IS_WASM_WORKER != 'undefined' && ENVIRONMENT_IS_WASM_WORKER) || (typeof ENVIRONMENT_IS_PTHREAD != 'undefined' && ENVIRONMENT_IS_PTHREAD) || (typeof ENVIRONMENT_IS_AUDIO_WORKLET != 'undefined' && ENVIRONMENT_IS_AUDIO_WORKLET)) Module['preRun'] = [];
     var necessaryPreJSTasks = Module['preRun'].slice();
-  // end include: /tmp/tmpmp5p86k4.js
-// include: /tmp/tmpmf0f_y5c.js
+  // end include: /tmp/tmpqvasncqs.js
+// include: /tmp/tmpi64124hk.js
 
     if (!Module['preRun']) throw 'Module.preRun should exist because file support used it; did a pre-js delete it?';
     necessaryPreJSTasks.forEach((task) => {
       if (Module['preRun'].indexOf(task) < 0) throw 'All preRun tasks that exist before user pre-js code should remain after; did you replace Module or modify Module.preRun?';
     });
-  // end include: /tmp/tmpmf0f_y5c.js
+  // end include: /tmp/tmpi64124hk.js
 
 
 var programArgs = [];
@@ -227,16 +242,7 @@ var quit_ = (status, toThrow) => {
   throw toThrow;
 };
 
-// In MODULARIZE mode _scriptName needs to be captured already at the very top of the page immediately when the page is parsed, so it is generated there
-// before the page load. In non-MODULARIZE modes generate it here.
-var _scriptName = globalThis.document?.currentScript?.src;
-
-if (typeof __filename != 'undefined') { // Node
-  _scriptName = __filename;
-} else
-if (ENVIRONMENT_IS_WORKER) {
-  _scriptName = self.location.href;
-}
+var _scriptName = import.meta.url;
 
 // `/` should be present at the end if `scriptDirectory` is not empty
 var scriptDirectory = '';
@@ -258,7 +264,9 @@ if (ENVIRONMENT_IS_NODE) {
   // the complexity of lazy-loading.
   var fs = require('node:fs');
 
-  scriptDirectory = __dirname + '/';
+  if (_scriptName.startsWith('file:')) {
+    scriptDirectory = require('node:path').dirname(require('node:url').fileURLToPath(_scriptName)) + '/';
+  }
 
 // include: node_shell_read.js
 readBinary = (filename) => {
@@ -282,11 +290,6 @@ readAsync = async (filename, binary = true) => {
   }
 
   programArgs = process.argv.slice(2);
-
-  // MODULARIZE will export the module in the proper place outside, we don't need to export here
-  if (typeof module != 'undefined') {
-    module['exports'] = Module;
-  }
 
   quit_ = (status, toThrow) => {
     process.exitCode = status;
@@ -509,53 +512,7 @@ function isExportedByForceFilesystem(name) {
          name === 'removeRunDependency';
 }
 
-/**
- * Intercept access to a symbols in the global symbol.  This enables us to give
- * informative warnings/errors when folks attempt to use symbols they did not
- * include in their build, or no symbols that no longer exist.
- *
- * We don't define this in MODULARIZE mode since in that mode emscripten symbols
- * are never placed in the global scope.
- */
-function hookGlobalSymbolAccess(sym, func) {
-  if (!Object.getOwnPropertyDescriptor(globalThis, sym)) {
-    Object.defineProperty(globalThis, sym, {
-      configurable: true,
-      get() {
-        func();
-        return undefined;
-      }
-    });
-  }
-}
-
-function missingGlobal(sym, msg) {
-  hookGlobalSymbolAccess(sym, () => {
-    warnOnce(`\`${sym}\` is no longer defined by emscripten. ${msg}`);
-  });
-}
-
-missingGlobal('buffer', 'Please use HEAP8.buffer or wasmMemory.buffer');
-missingGlobal('asm', 'Please use wasmExports instead');
-
 function missingLibrarySymbol(sym) {
-  hookGlobalSymbolAccess(sym, () => {
-    // Can't `abort()` here because it would break code that does runtime
-    // checks.  e.g. `if (typeof SDL === 'undefined')`.
-    var msg = `\`${sym}\` is a library symbol and not included by default; add it to your library.js __deps or to DEFAULT_LIBRARY_FUNCS_TO_INCLUDE on the command line`;
-    // DEFAULT_LIBRARY_FUNCS_TO_INCLUDE requires the name as it appears in
-    // library.js, which means $name for a JS name with no prefix, or name
-    // for a JS name like _name.
-    var librarySymbol = sym;
-    if (!librarySymbol.startsWith('_')) {
-      librarySymbol = '$' + sym;
-    }
-    msg += ` (e.g. -sDEFAULT_LIBRARY_FUNCS_TO_INCLUDE='${librarySymbol}')`;
-    if (isExportedByForceFilesystem(sym)) {
-      msg += '. Alternatively, forcing filesystem support (-sFORCE_FILESYSTEM) can export this for you';
-    }
-    warnOnce(msg);
-  });
 
   // Any symbol that is not included from the JS library is also (by definition)
   // not exported on the Module object.
@@ -629,10 +586,17 @@ var runtimeInitialized = false;
 
 
 
+// When ALLOW_MEMORY_GROWTH is enabled, the conversion from Wasm
+// memory to ArrayBuffer requires some additional logic.
+function getMemoryBuffer() {
+  return wasmMemory.buffer;
+}
+
 function updateMemoryViews() {
-  // When memory growth is disabled this function should be called exactly once.
-  assert(!HEAP8, 'updateMemoryViews should only be called once when ALLOW_MEMORY_GROWTH=0');
-  var b = wasmMemory.buffer;
+  // If we already have a heap that is resizeable/growable buffer we don't
+  // need to do anything in updateMemoryViews.
+  if (HEAP8?.buffer?.resizable) return;
+  var b = getMemoryBuffer();
   HEAP8 = new Int8Array(b);
   HEAP16 = new Int16Array(b);
   HEAPU8 = new Uint8Array(b);
@@ -641,7 +605,7 @@ function updateMemoryViews() {
   HEAPU32 = new Uint32Array(b);
   
   
-  HEAP64 = new BigInt64Array(b);
+  Module['HEAP64'] = HEAP64 = new BigInt64Array(b);
   
 }
 
@@ -746,7 +710,14 @@ function createExportWrapper(name, func, nargs) {
 var wasmBinaryFile;
 
 function findWasmBinary() {
-  return locateFile('main.wasm');
+
+  if (Module['locateFile']) {
+    return locateFile('main.wasm');
+  }
+
+  // Use bundler-friendly `new URL(..., import.meta.url)` pattern; works in browsers too.
+  return new URL('main.wasm', import.meta.url).href;
+
 }
 
 function getBinarySync(file) {
@@ -1653,6 +1624,13 @@ var stringToUTF8Array = (str, heap, outIdx, maxBytesToWrite) => {
         },
   write(stream, buffer, offset, length, position, canOwn) {
           assert(buffer.subarray, 'FS.write expects a TypedArray');
+          // If the buffer is located in main memory (HEAP), and if
+          // memory can grow, we can't hold on to references of the
+          // memory buffer, as they may get invalidated. That means we
+          // need to copy its contents.
+          if (buffer.buffer === HEAP8.buffer) {
+            canOwn = false;
+          }
   
           if (!length) return 0;
           var node = stream.node;
@@ -3980,15 +3958,84 @@ var stringToUTF8Array = (str, heap, outIdx, maxBytesToWrite) => {
 
   var _emscripten_date_now = () => Date.now();
 
-  var abortOnCannotGrowMemory = (requestedSize) => {
-      abort(`Cannot enlarge memory arrays to size ${requestedSize} bytes (OOM). Either (1) compile with -sINITIAL_MEMORY=X with X higher than the current value ${HEAP8.length}, (2) compile with -sALLOW_MEMORY_GROWTH which allows increasing the size at runtime, or (3) if you want malloc to return NULL (0) instead of this abort, compile with -sABORTING_MALLOC=0`);
+  var getHeapMax = () =>
+      // Stay one Wasm page short of 4GB: while e.g. Chrome is able to allocate
+      // full 4GB Wasm memories, the size will wrap back to 0 bytes in Wasm side
+      // for any code that deals with heap sizes, which would require special
+      // casing all heap size related code to treat 0 specially.
+      2147483648;
+  
+  var alignMemory = (size, alignment) => {
+      assert(alignment, 'alignment argument is required');
+      return Math.ceil(size / alignment) * alignment;
+    };
+  
+  var growMemory = (size) => {
+      var oldHeapSize = wasmMemory.buffer.byteLength;
+      var pages = ((size - oldHeapSize + 65535) / 65536) | 0;
+      try {
+        // round size grow request up to wasm page size (fixed 64KB per spec)
+        wasmMemory.grow(pages); // .grow() takes a delta compared to the previous size
+        updateMemoryViews();
+        return 1 /*success*/;
+      } catch(e) {
+        err(`growMemory: Attempted to grow heap from ${oldHeapSize} bytes to ${size} bytes, but got error: ${e}`);
+      }
+      // implicit 0 return to save code size (caller will cast 'undefined' into 0
+      // anyhow)
     };
   
   var _emscripten_resize_heap = (requestedSize) => {
       var oldSize = HEAPU8.length;
       // With CAN_ADDRESS_2GB or MEMORY64, pointers are already unsigned.
       requestedSize >>>= 0;
-      abortOnCannotGrowMemory(requestedSize);
+      // With multithreaded builds, races can happen (another thread might increase the size
+      // in between), so return a failure, and let the caller retry.
+      assert(requestedSize > oldSize);
+  
+      // Memory resize rules:
+      // 1.  Always increase heap size to at least the requested size, rounded up
+      //     to next page multiple.
+      // 2a. If MEMORY_GROWTH_LINEAR_STEP == -1, excessively resize the heap
+      //     geometrically: increase the heap size according to
+      //     MEMORY_GROWTH_GEOMETRIC_STEP factor (default +20%), At most
+      //     overreserve by MEMORY_GROWTH_GEOMETRIC_CAP bytes (default 96MB).
+      // 2b. If MEMORY_GROWTH_LINEAR_STEP != -1, excessively resize the heap
+      //     linearly: increase the heap size by at least
+      //     MEMORY_GROWTH_LINEAR_STEP bytes.
+      // 3.  Max size for the heap is capped at 2048MB-WASM_PAGE_SIZE, or by
+      //     MAXIMUM_MEMORY, or by ASAN limit, depending on which is smallest
+      // 4.  If we were unable to allocate as much memory, it may be due to
+      //     over-eager decision to excessively reserve due to (3) above.
+      //     Hence if an allocation fails, cut down on the amount of excess
+      //     growth, in an attempt to succeed to perform a smaller allocation.
+  
+      // A limit is set for how much we can grow. We should not exceed that
+      // (the wasm binary specifies it, so if we tried, we'd fail anyhow).
+      var maxHeapSize = getHeapMax();
+      if (requestedSize > maxHeapSize) {
+        err(`Cannot enlarge memory, requested ${requestedSize} bytes, but the limit is ${maxHeapSize} bytes!`);
+        return false;
+      }
+  
+      // Loop through potential heap size increases. If we attempt a too eager
+      // reservation that fails, cut down on the attempted size and reserve a
+      // smaller bump instead. (max 3 times, chosen somewhat arbitrarily)
+      for (var cutDown = 1; cutDown <= 4; cutDown *= 2) {
+        var overGrownHeapSize = oldSize * (1 + 0.2 / cutDown); // ensure geometric growth
+        // but limit overreserving (default to capping at +96MB overgrowth at most)
+        overGrownHeapSize = Math.min(overGrownHeapSize, requestedSize + 100663296 );
+  
+        var newSize = Math.min(maxHeapSize, alignMemory(Math.max(requestedSize, overGrownHeapSize), 65536));
+  
+        var replacement = growMemory(newSize);
+        if (replacement) {
+  
+          return true;
+        }
+      }
+      err(`Failed to grow the heap from ${oldSize} bytes to ${newSize} bytes, not enough memory!`);
+      return false;
     };
 
   function _fd_close(fd) {
@@ -4214,6 +4261,7 @@ var stringToUTF8Array = (str, heap, outIdx, maxBytesToWrite) => {
     };
 
 
+
   var FS_createPath = (...args) => FS.createPath(...args);
 
 
@@ -4304,8 +4352,6 @@ if (Module['printErr']) err = Module['printErr'];
   'createNamedFunction',
   'zeroMemory',
   'exitJS',
-  'getHeapMax',
-  'growMemory',
   'withStackSave',
   'inetPton4',
   'inetNtop4',
@@ -4326,7 +4372,6 @@ if (Module['printErr']) err = Module['printErr'];
   'callUserCallback',
   'maybeExit',
   'asmjsMangle',
-  'alignMemory',
   'HandleAllocator',
   'addOnInit',
   'addOnPostCtor',
@@ -4474,13 +4519,13 @@ missingLibrarySymbols.forEach(missingLibrarySymbol)
   'HEAPU32',
   'HEAPF32',
   'HEAPF64',
-  'HEAP64',
   'HEAPU64',
   'stackSave',
   'stackRestore',
   'stackAlloc',
   'ptrToString',
-  'abortOnCannotGrowMemory',
+  'getHeapMax',
+  'growMemory',
   'ENV',
   'ERRNO_CODES',
   'strError',
@@ -4491,6 +4536,7 @@ missingLibrarySymbols.forEach(missingLibrarySymbol)
   'warnOnce',
   'readEmAsmArgsArray',
   'asyncLoad',
+  'alignMemory',
   'mmapAlloc',
   'wasmTable',
   'wasmMemory',
@@ -4747,7 +4793,7 @@ function assignWasmExports(wasmExports) {
   assert(typeof wasmExports['memory'] != 'undefined', 'missing Wasm export: memory');
   assert(typeof wasmExports['__indirect_function_table'] != 'undefined', 'missing Wasm export: __indirect_function_table');
   _init_solver = Module['_init_solver'] = createExportWrapper('init_solver', wasmExports['init_solver'], 0);
-  _solve = Module['_solve'] = createExportWrapper('solve', wasmExports['solve'], 3);
+  _solve = Module['_solve'] = createExportWrapper('solve', wasmExports['solve'], 4);
   _fflush = createExportWrapper('fflush', wasmExports['fflush'], 1);
   _delete_solver = Module['_delete_solver'] = createExportWrapper('delete_solver', wasmExports['delete_solver'], 0);
   _main = createExportWrapper('main', wasmExports['main'], 2);
@@ -4879,9 +4925,39 @@ function checkUnflushedContent() {
 
 var wasmExports;
 
-// With async instantation wasmExports is assigned asynchronously when the
-// instance is received.
-createWasm().then(() => run());
+// In modularize mode the generated code is within a factory function so we
+// can use await here (since it's not top-level-await).
+wasmExports = await createWasm();
+await run();
 
 // end include: postamble.js
+
+// include: postamble_modularize.js
+// In MODULARIZE mode we wrap the generated code in a factory function
+// and return either the Module itself, or a promise of the module.
+
+// Assertion for attempting to access module properties on the incoming
+// moduleArg.  In the past we used this object as the prototype of the module
+// and assigned properties to it, but now we return a distinct object.  This
+// keeps the instance private until it is ready (i.e the promise has been
+// resolved).
+for (const prop of Object.keys(Module)) {
+  if (!(prop in moduleArg)) {
+    Object.defineProperty(moduleArg, prop, {
+      configurable: true,
+      get() {
+        abort(`Access to module property ('${prop}') is no longer possible via the module constructor argument; Instead, use the result of the module constructor.`)
+      }
+    });
+  }
+}
+// end include: postamble_modularize.js
+
+
+
+  return Module;
+}
+
+// Export using a UMD style export, or ES6 exports if selected
+export default Module;
 
